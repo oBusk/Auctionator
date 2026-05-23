@@ -17,28 +17,26 @@ function Auctionator.CraftingInfo.DoTrackedRecipesSearch()
   local searchTerms = {}
 
   local possibleItems = {}
-  local quantities = {}
   local continuableContainer = ContinuableContainer:Create()
 
   local function ProcessRecipe(recipeID, isRecraft)
     local outputData = C_TradeSkillUI.GetRecipeOutputItemData(recipeID, {})
     local outputLink = outputData and outputData.hyperlink
     if outputLink then
-      table.insert(possibleItems, outputLink)
+      table.insert(possibleItems, {item = outputLink, quantity = 0})
       continuableContainer:AddContinuable(Item:CreateFromItemLink(outputLink))
     -- Special case, enchants don't include an output in the API, so we use a
     -- precomputed table to get the output
     elseif Auctionator.CraftingInfo.EnchantSpellsToItems[recipeID] then
       local itemID = Auctionator.CraftingInfo.EnchantSpellsToItems[recipeID][1]
-      table.insert(possibleItems, itemID)
+      table.insert(possibleItems, {item = itemID, quantity = 0})
       continuableContainer:AddContinuable(Item:CreateFromItemID(itemID))
     -- Probably doesn't have a specific item output, but include the recipe name
     -- anyway just in case
     else
       local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
-      table.insert(possibleItems, {recipeName = recipeInfo.name})
+      table.insert(possibleItems, {itemName = recipeInfo.name, quantity = 0})
     end
-    table.insert(quantities, 0)
 
     local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, isRecraft)
     -- Select all mandatory reagents
@@ -46,14 +44,18 @@ function Auctionator.CraftingInfo.DoTrackedRecipesSearch()
       if reagentSlotSchematic.reagentType == Enum.CraftingReagentType.Basic and #reagentSlotSchematic.reagents > 0 then
         local itemID = reagentSlotSchematic.reagents[1].itemID
         if itemID ~= nil then
-          local index = tIndexOf(possibleItems, itemID)
-          if index == nil then
+          local existing = nil
+          for _, entry in ipairs(possibleItems) do
+            if entry.item == itemID then
+              existing = entry
+              break
+            end
+          end
+          if existing == nil then
             continuableContainer:AddContinuable(Item:CreateFromItemID(itemID))
-
-            table.insert(possibleItems, itemID)
-            table.insert(quantities, reagentSlotSchematic.quantityRequired)
+            table.insert(possibleItems, {item = itemID, quantity = reagentSlotSchematic.quantityRequired})
           else
-            quantities[index] = quantities[index] + reagentSlotSchematic.quantityRequired
+            existing.quantity = existing.quantity + reagentSlotSchematic.quantityRequired
           end
         end
       end
@@ -71,13 +73,13 @@ function Auctionator.CraftingInfo.DoTrackedRecipesSearch()
   end
 
   local function OnItemInfoReady()
-    for index, item in ipairs(possibleItems) do
-      if type(item) == "table" then
-        table.insert(searchTerms, {searchString = item.recipeName})
+    for _, entry in ipairs(possibleItems) do
+      if entry.itemName then
+        table.insert(searchTerms, {searchString = entry.itemName})
       else
-        local itemInfo = {C_Item.GetItemInfo(item)}
+        local itemInfo = {C_Item.GetItemInfo(entry.item)}
         if not Auctionator.Utilities.IsBound(itemInfo) then
-          table.insert(searchTerms, {searchString = itemInfo[1], isExact = true, quantity = quantities[index]})
+          table.insert(searchTerms, {searchString = itemInfo[1], isExact = true, quantity = entry.quantity})
         end
       end
     end
