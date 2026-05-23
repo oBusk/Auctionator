@@ -36,7 +36,7 @@ function Auctionator.CraftingInfo.DoTrackedRecipesSearch()
     -- anyway just in case
     else
       local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
-      table.insert(searchTerms, {searchString = recipeInfo.name})
+      table.insert(possibleItems, {recipeName = recipeInfo.name})
     end
     table.insert(quantities, 0)
 
@@ -71,10 +71,14 @@ function Auctionator.CraftingInfo.DoTrackedRecipesSearch()
   end
 
   local function OnItemInfoReady()
-    for index, itemInfo in ipairs(possibleItems) do
-      local itemInfo = {C_Item.GetItemInfo(itemInfo)}
-      if not Auctionator.Utilities.IsBound(itemInfo) then
-        table.insert(searchTerms, {searchString = itemInfo[1], isExact = true, quantity = quantities[index]})
+    for index, item in ipairs(possibleItems) do
+      if type(item) == "table" then
+        table.insert(searchTerms, {searchString = item.recipeName})
+      else
+        local itemInfo = {C_Item.GetItemInfo(item)}
+        if not Auctionator.Utilities.IsBound(itemInfo) then
+          table.insert(searchTerms, {searchString = itemInfo[1], isExact = true, quantity = quantities[index]})
+        end
       end
     end
 
